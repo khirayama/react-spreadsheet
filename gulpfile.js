@@ -1,0 +1,92 @@
+'use strict';
+var gulp = require('gulp');
+var browserSync = require('browser-sync');
+var plumber = require('gulp-plumber');
+var jade = require('gulp-jade');
+var sass = require('gulp-sass');
+var please = require('gulp-pleeease');
+var browserify = require('gulp-browserify');
+var notify = require('gulp-notify');
+var mocha = require('gulp-spawn-mocha');
+
+var options = {
+  plumber: {
+    errorHandler: notify.onError({
+      message: 'Error: <%= error.message %>',
+      sound: false,
+      wait: true
+    })
+  }
+};
+
+gulp.task('markups', function() {
+  return gulp.src('dev/index.jade')
+    .pipe(plumber(options.plumber))
+    .pipe(jade())
+    .pipe(gulp.dest('public/'))
+    .pipe(browserSync.reload({stream: true}));
+});
+
+gulp.task('styles', function() {
+  return gulp.src('dev/app.scss')
+    .pipe(plumber(options.plumber))
+    .pipe(sass({
+      errLogToConsole: true,
+      sourceComments: 'normal'
+    }))
+    .pipe(please({
+      'minifier': false,
+      'autoprefixer': {'browsers': ['last 4 version', 'ie 8', 'iOS 4', 'Android 2.3']}
+    }))
+    .pipe(gulp.dest('public/'))
+    .pipe(browserSync.reload({stream: true}));
+});
+
+gulp.task('scripts', function() {
+  return gulp.src(['dev/spreadsheet/spreadsheet.jsx'])
+    .pipe(plumber(options.plumber))
+    .pipe(browserify({
+      outfile: 'app.js',
+      transform: ['babelify'],
+      debug: true,
+      extensions: ['.jsx', '.js']
+    }))
+    .pipe(gulp.dest('public/'))
+    .pipe(browserSync.reload({stream: true}));
+});
+
+gulp.task('images', function() {
+  return gulp.src(['dev/**/*.+(png|jpg|gif)'])
+    .pipe(plumber(options.plumber))
+    .pipe(gulp.dest('public/'));
+});
+
+gulp.task('files', function() {
+  return gulp.src(['dev/**/*.+(csv|json)'])
+    .pipe(gulp.dest('public/'));
+});
+
+gulp.task('test', function() {
+  return gulp.src(['test/**/*.test.js'])
+    .pipe(mocha({
+	    compilers: 'js:babel/register'
+    }));
+});
+
+gulp.task('browserSync', ['markups', 'styles', 'scripts', 'images', 'files'], function() {
+  return browserSync.init(null, {
+    server: {baseDir: 'public/'},
+    notify: false,
+    open: 'external'
+  });
+});
+
+gulp.task('watch', function() {
+  gulp.watch(['dev/**/*.scss'], ['styles']);
+  gulp.watch(['dev/**/*.jade'], ['markups']);
+  gulp.watch(['dev/**/*.js', 'dev/**/*.jsx', '!dev/**/*.test.js'], ['scripts']);
+  // gulp.watch(['dev/**/*.js'], ['test']);
+  gulp.watch(['dev/**/*.+(png|jpg|gif)'], ['files']);
+});
+
+gulp.task('develop', ['watch', 'browserSync']);
